@@ -282,7 +282,12 @@
         <button class="btn btn-primary mt12" onclick="useManualInput()">Sätze übernehmen</button>
       </div>
 
-      <button class="btn btn-primary mt16" id="evalBtn" onclick="evaluate()" disabled>
+      <!-- Fallback: manually confirm transcripts -->
+      <button class="btn btn-ghost mt16" id="confirmBtn" onclick="confirmFromTranscripts()" style="display:none">
+        ✅ &nbsp;Sätze bestätigen &amp; weiter
+      </button>
+
+      <button class="btn btn-primary mt12" id="evalBtn" onclick="evaluate()" disabled>
         <span id="evalBtnText">KI-Bewertung anfordern 🤖</span>
       </button>
       <button class="btn btn-link" onclick="skipToNext()">Überspringen →</button>
@@ -627,10 +632,13 @@ function startRecording(n) {
   recognition.onend = () => {
     isRecording = false;
     resetRecBtn(n);
-    const text = finalText.trim() || document.getElementById('transcript' + n).textContent;
+    const text = finalText.trim() || document.getElementById('transcript' + n).textContent.trim();
     if (text && text !== '–' && text !== '…') {
       sentences[n - 1] = text;
       afterSentenceRecorded(n);
+    } else {
+      // Even if text capture failed, check transcripts as fallback
+      checkEnableEval();
     }
   };
 
@@ -646,13 +654,47 @@ function startRecording(n) {
   recognition.start();
 }
 
+function captureFromTranscript(n) {
+  const text = document.getElementById('transcript' + n).textContent.trim();
+  if (text && text !== '–' && text !== '…') {
+    sentences[n - 1] = text;
+    return true;
+  }
+  return false;
+}
+
+function checkEnableEval() {
+  // Fallback: capture from transcript elements if sentences not yet set
+  if (!sentences[0]) captureFromTranscript(1);
+  if (!sentences[1]) captureFromTranscript(2);
+
+  if (sentences[0] && sentences[1]) {
+    document.getElementById('evalBtn').disabled = false;
+    document.getElementById('confirmBtn').style.display = 'none';
+  } else {
+    // Show manual confirm button if at least one transcript has text
+    const t1 = document.getElementById('transcript1').textContent;
+    const t2 = document.getElementById('transcript2').textContent;
+    if ((t1 && t1 !== '–') || (t2 && t2 !== '–')) {
+      document.getElementById('confirmBtn').style.display = '';
+    }
+  }
+}
+
+function confirmFromTranscripts() {
+  captureFromTranscript(1);
+  captureFromTranscript(2);
+  if (sentences[0] && sentences[1]) {
+    document.getElementById('evalBtn').disabled = false;
+    document.getElementById('confirmBtn').style.display = 'none';
+  }
+}
+
 function afterSentenceRecorded(n) {
   if (n === 1) {
     document.getElementById('recBtn2').disabled = false;
   }
-  if (sentences[0] && sentences[1]) {
-    document.getElementById('evalBtn').disabled = false;
-  }
+  checkEnableEval();
 }
 
 function resetRecBtn(n) {
