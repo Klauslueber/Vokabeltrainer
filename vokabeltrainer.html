@@ -282,9 +282,8 @@
         <button class="btn btn-primary mt12" onclick="useManualInput()">Sätze übernehmen</button>
       </div>
 
-      <!-- Fallback: manually confirm transcripts -->
-      <button class="btn btn-ghost mt16" id="confirmBtn" onclick="confirmFromTranscripts()" style="display:none">
-        ✅ &nbsp;Sätze bestätigen &amp; weiter
+      <button class="btn btn-ghost mt16" id="confirmBtn" onclick="confirmFromTranscripts()">
+        ✅ &nbsp;Sätze bestätigen &amp; bewerten
       </button>
 
       <button class="btn btn-primary mt12" id="evalBtn" onclick="evaluate()" disabled>
@@ -684,20 +683,19 @@ function checkEnableEval() {
   if (sentences[0] && sentences[1]) {
     document.getElementById('evalBtn').disabled = false;
   }
-  // Show confirm button whenever at least one transcript has text
-  const t1 = document.getElementById('transcript1').textContent;
-  const t2 = document.getElementById('transcript2').textContent;
-  if ((t1 && t1 !== '–') || (t2 && t2 !== '–')) {
-    document.getElementById('confirmBtn').style.display = '';
-  }
 }
 
 function confirmFromTranscripts() {
   captureFromTranscript(1);
   captureFromTranscript(2);
-  if (sentences[0] && sentences[1]) {
+  if (sentences[0] || sentences[1]) {
+    // Fill missing sentence with placeholder if only one was recorded
+    if (!sentences[0]) sentences[0] = '(nicht aufgenommen)';
+    if (!sentences[1]) sentences[1] = '(nicht aufgenommen)';
     document.getElementById('evalBtn').disabled = false;
-    document.getElementById('confirmBtn').style.display = 'none';
+    document.getElementById('evalBtn').click();
+  } else {
+    alert('Bitte mindestens einen Satz einsprechen.');
   }
 }
 
