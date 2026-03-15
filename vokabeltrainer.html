@@ -422,6 +422,7 @@ let voc = null;        // current vocab entry
 let sentences = ['', ''];
 let recognition = null;
 let isRecording = false;
+let activeN = 0;
 let speechSupported = false;
 
 // ═══════════════════════════════════════════════════════════
@@ -512,6 +513,7 @@ function loadWord() {
   document.getElementById('recBtn2').disabled = true;
   document.getElementById('evalBtn').disabled = true;
   document.getElementById('evalBtnText').textContent = useAPI ? 'KI-Bewertung anfordern 🤖' : 'Sätze prüfen ✓';
+  document.getElementById('confirmBtn').style.display = 'none';
 
   if (speechSupported) {
     hide('iosFallback');
@@ -601,7 +603,12 @@ function normalize(s) {
 // SPEECH RECOGNITION
 // ═══════════════════════════════════════════════════════════
 function startRecording(n) {
-  if (isRecording) { if (recognition) recognition.stop(); return; }
+  if (isRecording) {
+    // Capture current transcript text immediately before stopping
+    captureFromTranscript(activeN);
+    if (recognition) recognition.stop();
+    return;
+  }
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { show('iosFallback'); return; }
@@ -615,6 +622,7 @@ function startRecording(n) {
   btn.className = 'btn btn-record recording';
   btn.textContent = '⏹  Aufnahme stoppen';
   isRecording = true;
+  activeN = n;
 
   let finalText = '';
 
@@ -627,6 +635,11 @@ function startRecording(n) {
     const el = document.getElementById('transcript' + n);
     el.textContent = (finalText + interim).trim() || '…';
     el.className = 'transcript has-text';
+    // Save immediately on final results (iOS may not fire onend reliably)
+    if (finalText.trim()) {
+      sentences[n - 1] = finalText.trim();
+      afterSentenceRecorded(n);
+    }
   };
 
   recognition.onend = () => {
