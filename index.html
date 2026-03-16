@@ -173,7 +173,7 @@
 
 <!-- Header -->
 <div class="header">
-  <h1 class="header-title">🎓 Vokabeltrainer <small style="font-size:10px;opacity:.5">v3</small></h1>
+  <h1 class="header-title">🎓 Vokabeltrainer</h1>
   <div class="header-right">
     <span class="progress-text" id="progressText">0 / 85</span>
     <button class="icon-btn" onclick="openSettings()" title="Einstellungen">⚙️</button>
@@ -282,12 +282,8 @@
         <button class="btn btn-primary mt12" onclick="useManualInput()">Sätze übernehmen</button>
       </div>
 
-      <button class="btn btn-ghost mt16" id="confirmBtn" onclick="confirmFromTranscripts()">
-        ✅ &nbsp;Sätze bestätigen &amp; bewerten
-      </button>
-
-      <button class="btn btn-primary mt12" id="evalBtn" onclick="evaluate()" disabled>
-        <span id="evalBtnText">KI-Bewertung anfordern 🤖</span>
+      <button class="btn btn-primary mt16" id="confirmBtn" onclick="confirmFromTranscripts()">
+        ✅ &nbsp;Sätze bewerten
       </button>
       <button class="btn btn-link" onclick="skipToNext()">Überspringen →</button>
     </div>
@@ -315,9 +311,6 @@
     </p>
     <button class="btn btn-primary" onclick="restart()">Von vorne beginnen 🔄</button>
   </div>
-
-  <!-- Debug Panel -->
-  <div id="debugPanel" style="background:#1E293B;color:#34D399;font-family:monospace;font-size:11px;padding:10px;border-radius:8px;margin-top:16px;max-height:150px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;"></div>
 
 </div><!-- /main -->
 
@@ -690,17 +683,17 @@ function confirmFromTranscripts() {
   try {
     var t1 = document.getElementById('transcript1').textContent.trim();
     var t2 = document.getElementById('transcript2').textContent.trim();
-    debugLog('confirmFromTranscripts: t1="' + t1 + '", t2="' + t2 + '"');
+    //debugLog('confirmFromTranscripts: t1="' + t1 + '", t2="' + t2 + '"');
     if (t1 && t1 !== '–' && t1 !== '…') sentences[0] = t1;
     if (t2 && t2 !== '–' && t2 !== '…') sentences[1] = t2;
     if (!sentences[0]) sentences[0] = '(nicht aufgenommen)';
     if (!sentences[1]) sentences[1] = '(nicht aufgenommen)';
-    debugLog('sentences: [' + sentences[0] + '] [' + sentences[1] + ']');
+    //debugLog('sentences: [' + sentences[0] + '] [' + sentences[1] + ']');
     document.getElementById('evalBtn').disabled = false;
     evaluate();
   } catch(e) {
     alert('Fehler confirmFromTranscripts: ' + e.message);
-    debugLog('ERROR: ' + e.message);
+    //debugLog('ERROR: ' + e.message);
   }
 }
 
@@ -731,22 +724,22 @@ function useManualInput() {
 // ═══════════════════════════════════════════════════════════
 async function evaluate() {
   try {
-    debugLog('evaluate() called. useAPI=' + useAPI + ', apiKey=' + (apiKey ? 'SET' : 'EMPTY'));
-    debugLog('sentences: [' + sentences[0] + '] [' + sentences[1] + ']');
+    //debugLog('evaluate() called. useAPI=' + useAPI + ', apiKey=' + (apiKey ? 'SET' : 'EMPTY'));
+    //debugLog('sentences: [' + sentences[0] + '] [' + sentences[1] + ']');
     const btn = document.getElementById('evalBtn');
     btn.disabled = true;
     document.getElementById('evalBtnText').innerHTML = '<div class="spinner"></div>&nbsp;Auswertung …';
 
     if (useAPI && apiKey) {
-      debugLog('calling evaluateWithClaude...');
+      //debugLog('calling evaluateWithClaude...');
       await evaluateWithClaude();
     } else {
-      debugLog('calling evaluateLocally...');
+      //debugLog('calling evaluateLocally...');
       evaluateLocally();
     }
   } catch(e) {
     alert('Fehler evaluate: ' + e.message);
-    debugLog('ERROR evaluate: ' + e.message + '\n' + e.stack);
+    //debugLog('ERROR evaluate: ' + e.message + '\n' + e.stack);
   }
 }
 
@@ -897,7 +890,6 @@ window.onerror = function(msg, url, line) {
 
 window.addEventListener('load', () => {
   speechSynthesis.getVoices(); // warm-up
-  debugLog('App loaded v3');
   init();
 });
 document.addEventListener('visibilitychange', () => {
