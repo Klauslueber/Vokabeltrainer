@@ -506,8 +506,6 @@ function loadWord() {
   document.getElementById('transcript2').textContent = '–';
   document.getElementById('transcript2').className = 'transcript';
   document.getElementById('recBtn2').disabled = true;
-  document.getElementById('evalBtn').disabled = true;
-  document.getElementById('evalBtnText').textContent = useAPI ? 'KI-Bewertung anfordern 🤖' : 'Sätze prüfen ✓';
   if (speechSupported) {
     hide('iosFallback');
   } else {
@@ -674,9 +672,6 @@ function checkEnableEval() {
   if (!sentences[0]) captureFromTranscript(1);
   if (!sentences[1]) captureFromTranscript(2);
 
-  if (sentences[0] && sentences[1]) {
-    document.getElementById('evalBtn').disabled = false;
-  }
 }
 
 function confirmFromTranscripts() {
@@ -689,7 +684,6 @@ function confirmFromTranscripts() {
     if (!sentences[0]) sentences[0] = '(nicht aufgenommen)';
     if (!sentences[1]) sentences[1] = '(nicht aufgenommen)';
     //debugLog('sentences: [' + sentences[0] + '] [' + sentences[1] + ']');
-    document.getElementById('evalBtn').disabled = false;
     evaluate();
   } catch(e) {
     alert('Fehler confirmFromTranscripts: ' + e.message);
@@ -716,7 +710,6 @@ function useManualInput() {
   const s2 = document.getElementById('manualS2').value.trim();
   if (s1) { sentences[0] = s1; document.getElementById('transcript1').textContent = s1; document.getElementById('transcript1').className = 'transcript has-text'; }
   if (s2) { sentences[1] = s2; document.getElementById('transcript2').textContent = s2; document.getElementById('transcript2').className = 'transcript has-text'; }
-  if (sentences[0] && sentences[1]) document.getElementById('evalBtn').disabled = false;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -726,10 +719,6 @@ async function evaluate() {
   try {
     //debugLog('evaluate() called. useAPI=' + useAPI + ', apiKey=' + (apiKey ? 'SET' : 'EMPTY'));
     //debugLog('sentences: [' + sentences[0] + '] [' + sentences[1] + ']');
-    const btn = document.getElementById('evalBtn');
-    btn.disabled = true;
-    document.getElementById('evalBtnText').innerHTML = '<div class="spinner"></div>&nbsp;Auswertung …';
-
     if (useAPI && apiKey) {
       //debugLog('calling evaluateWithClaude...');
       await evaluateWithClaude();
