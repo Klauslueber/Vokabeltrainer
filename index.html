@@ -173,7 +173,7 @@
 
 <!-- Header -->
 <div class="header">
-  <h1 class="header-title">🎓 Vokabeltrainer</h1>
+  <h1 class="header-title">🎓 Vokabeltrainer <small style="font-size:10px;opacity:.5">v3</small></h1>
   <div class="header-right">
     <span class="progress-text" id="progressText">0 / 85</span>
     <button class="icon-btn" onclick="openSettings()" title="Einstellungen">⚙️</button>
@@ -315,6 +315,9 @@
     </p>
     <button class="btn btn-primary" onclick="restart()">Von vorne beginnen 🔄</button>
   </div>
+
+  <!-- Debug Panel -->
+  <div id="debugPanel" style="background:#1E293B;color:#34D399;font-family:monospace;font-size:11px;padding:10px;border-radius:8px;margin-top:16px;max-height:150px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;"></div>
 
 </div><!-- /main -->
 
@@ -684,16 +687,20 @@ function checkEnableEval() {
 }
 
 function confirmFromTranscripts() {
-  captureFromTranscript(1);
-  captureFromTranscript(2);
-  if (sentences[0] || sentences[1]) {
-    // Fill missing sentence with placeholder if only one was recorded
+  try {
+    var t1 = document.getElementById('transcript1').textContent.trim();
+    var t2 = document.getElementById('transcript2').textContent.trim();
+    debugLog('confirmFromTranscripts: t1="' + t1 + '", t2="' + t2 + '"');
+    if (t1 && t1 !== '–' && t1 !== '…') sentences[0] = t1;
+    if (t2 && t2 !== '–' && t2 !== '…') sentences[1] = t2;
     if (!sentences[0]) sentences[0] = '(nicht aufgenommen)';
     if (!sentences[1]) sentences[1] = '(nicht aufgenommen)';
+    debugLog('sentences: [' + sentences[0] + '] [' + sentences[1] + ']');
     document.getElementById('evalBtn').disabled = false;
-    document.getElementById('evalBtn').click();
-  } else {
-    alert('Bitte mindestens einen Satz einsprechen.');
+    evaluate();
+  } catch(e) {
+    alert('Fehler confirmFromTranscripts: ' + e.message);
+    debugLog('ERROR: ' + e.message);
   }
 }
 
@@ -723,14 +730,23 @@ function useManualInput() {
 // EVALUATION
 // ═══════════════════════════════════════════════════════════
 async function evaluate() {
-  const btn = document.getElementById('evalBtn');
-  btn.disabled = true;
-  document.getElementById('evalBtnText').innerHTML = '<div class="spinner"></div>&nbsp;Auswertung …';
+  try {
+    debugLog('evaluate() called. useAPI=' + useAPI + ', apiKey=' + (apiKey ? 'SET' : 'EMPTY'));
+    debugLog('sentences: [' + sentences[0] + '] [' + sentences[1] + ']');
+    const btn = document.getElementById('evalBtn');
+    btn.disabled = true;
+    document.getElementById('evalBtnText').innerHTML = '<div class="spinner"></div>&nbsp;Auswertung …';
 
-  if (useAPI && apiKey) {
-    await evaluateWithClaude();
-  } else {
-    evaluateLocally();
+    if (useAPI && apiKey) {
+      debugLog('calling evaluateWithClaude...');
+      await evaluateWithClaude();
+    } else {
+      debugLog('calling evaluateLocally...');
+      evaluateLocally();
+    }
+  } catch(e) {
+    alert('Fehler evaluate: ' + e.message);
+    debugLog('ERROR evaluate: ' + e.message + '\n' + e.stack);
   }
 }
 
@@ -866,8 +882,22 @@ function updateProgress() {
 // ═══════════════════════════════════════════════════════════
 // START
 // ═══════════════════════════════════════════════════════════
+// Debug logging - visible on screen
+function debugLog(msg) {
+  console.log(msg);
+  var el = document.getElementById('debugPanel');
+  if (el) el.textContent = msg + '\n' + el.textContent;
+}
+
+// Global error handler
+window.onerror = function(msg, url, line) {
+  debugLog('GLOBAL ERROR: ' + msg + ' (line ' + line + ')');
+  alert('JS Error: ' + msg + ' (line ' + line + ')');
+};
+
 window.addEventListener('load', () => {
   speechSynthesis.getVoices(); // warm-up
+  debugLog('App loaded v3');
   init();
 });
 document.addEventListener('visibilitychange', () => {
