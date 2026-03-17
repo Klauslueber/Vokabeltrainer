@@ -187,12 +187,12 @@
   <div id="setupScreen" class="card">
     <div class="hero">🎓</div>
     <h2>Vokabeltrainer Englisch</h2>
-    <p>85 Vokabeln aus deiner Notizen-App. Aussprache, Bedeutung & Sätze sprechen — mit KI-Feedback.</p>
+    <p id="vocabCount">Vokabeln werden geladen …</p>
 
     <div class="form-group">
       <label class="form-label" for="apiKeyInput">Claude API-Key (für KI-Bewertung)</label>
       <input type="password" class="input-field" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off">
-      <div class="form-hint">Ohne Key läuft die App lokal ohne KI-Bewertung. Den Key bekommst du auf console.anthropic.com.</div>
+      <div class="form-hint">Ohne Key läuft die App lokal ohne KI-Bewertung.</div>
     </div>
 
     <div class="form-group">
@@ -202,8 +202,10 @@
       </label>
     </div>
 
-    <button class="btn btn-primary" onclick="startTraining()">Training starten 🚀</button>
-    <button class="btn btn-link mt12" onclick="startWithoutAPI()">Ohne KI-Bewertung starten</button>
+    <button class="btn btn-primary" onclick="startTraining()" id="startBtn" disabled>Training starten 🚀</button>
+    <button class="btn btn-link mt12" onclick="startWithoutAPI()" id="startNoApiBtn" disabled>Ohne KI-Bewertung starten</button>
+    <div class="divider"></div>
+    <button class="btn btn-ghost" onclick="showAddVocab()">➕ &nbsp;Neue Vokabel hinzufügen</button>
   </div>
 
   <!-- ═══════════════ TRAINING ═══════════════ -->
@@ -302,12 +304,41 @@
 
   </div><!-- /trainingScreen -->
 
+  <!-- ═══════════════ ADD VOCAB ═══════════════ -->
+  <div id="addVocabScreen" class="card hidden">
+    <h2 style="font-size:20px;margin:0 0 16px">➕ Neue Vokabel</h2>
+    <div class="form-group">
+      <label class="form-label">Englisches Wort / Phrase *</label>
+      <input type="text" class="input-field" id="newWord" placeholder="z.B. resilient">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Deutsche Bedeutungen * (kommagetrennt)</label>
+      <input type="text" class="input-field" id="newTranslations" placeholder="z.B. widerstandsfähig, belastbar">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Beispielsatz (Englisch)</label>
+      <input type="text" class="input-field" id="newExample" placeholder="z.B. She is very resilient.">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Schlüsselwort (für Satzerkennung)</label>
+      <input type="text" class="input-field" id="newKey" placeholder="z.B. resilient">
+      <div class="form-hint">Wird automatisch vom Wort abgeleitet, wenn leer.</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Aussprache-Hinweis (optional)</label>
+      <input type="text" class="input-field" id="newHint" placeholder="z.B. re-ZIL-i-ent">
+    </div>
+    <div id="addFeedback" class="mt12"></div>
+    <button class="btn btn-success mt12" onclick="saveNewVocab()">Speichern ✓</button>
+    <button class="btn btn-link" onclick="hideAddVocab()">← Zurück</button>
+  </div>
+
   <!-- ═══════════════ COMPLETION ═══════════════ -->
   <div id="completionScreen" class="card hidden">
     <div class="trophy">🏆</div>
     <h2 style="font-size:22px;margin:0 0 10px">Alle Vokabeln trainiert!</h2>
     <p style="color:var(--muted);font-size:15px;line-height:1.6">
-      Du hast alle 85 Vokabeln durchgearbeitet. Hervorragende Leistung!
+      Du hast alle Vokabeln durchgearbeitet. Hervorragende Leistung!
     </p>
     <button class="btn btn-primary" onclick="restart()">Von vorne beginnen 🔄</button>
   </div>
@@ -316,95 +347,15 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════
-// VOCABULARY DATA — 85 entries
+// SUPABASE CONFIG
 // ═══════════════════════════════════════════════════════════
-const VOCAB = [
-  { w:"wary",               de:["vorsichtig","misstrauisch"],                    ex:"She watched him warily.",                              key:"wary" },
-  { w:"relish",             de:["genießen","freude","mögen"],                    ex:"I should relish what I have now.",                     key:"relish" },
-  { w:"eerily",             de:["unheimlich"],                                   ex:"The house was eerily quiet.",                          key:"eerily" },
-  { w:"reel",               de:["wanken","taumeln","torkeln"],                   ex:"He reeled back in shock.",                             key:"reel" },
-  { w:"bleak",              de:["düster","trostlos","hoffnungslos"],              ex:"The future looked bleak.",                             key:"bleak" },
-  { w:"hold sway",          de:["sagen haben","herrschen","dominieren"],         ex:"Old traditions still hold sway in rural areas.",       key:"sway" },
-  { w:"be swayed by",       de:["beeinflusst werden","überzeugt werden"],        ex:"Don't be swayed by his charm.",                        key:"swayed" },
-  { w:"hunker down",        de:["durchhalten","abwarten","verharren"],           ex:"They hunkered down and waited out the storm.",          key:"hunker" },
-  { w:"trifle",             de:["kleinigkeit","lappalie","wenigkeit"],           ex:"It only costs a trifle.",                              key:"trifle" },
-  { w:"boast",              de:["prahlen","angeben","rühmen"],                   ex:"He boasted about his achievements.",                   key:"boast" },
-  { w:"audacious",          de:["dreist","kühn","verwegen","wagemutig"],         ex:"It was an audacious plan.",                            key:"audacious" },
-  { w:"thrifty",            de:["sparsam","haushälterisch"],                     ex:"She is very thrifty with her money.",                  key:"thrifty" },
-  { w:"albeit",             de:["obwohl","allerdings","wenngleich","obgleich"],  ex:"It was a success, albeit a modest one.",               key:"albeit",  hint:"📣 Aussprache: all-BEE-it" },
-  { w:"defy",               de:["missachten","widersetzen","trotzen"],           ex:"He defied his parents' wishes and moved abroad.",      key:"def" },
-  { w:"enter the fray",     de:["kampf","einsteigen","mitmischen"],              ex:"Several new candidates entered the fray.",             key:"fray" },
-  { w:"double down",        de:["beharren","verdoppeln","nicht nachgeben"],      ex:"Instead of apologising, he doubled down.",             key:"double down" },
-  { w:"concede",            de:["zugeben","eingestehen","zugestehen"],           ex:"She conceded that she had made a mistake.",            key:"concede" },
-  { w:"tout",               de:["anpreisen","bewerben","anbieten"],              ex:"The product was touted as a miracle cure.",            key:"tout" },
-  { w:"offset",             de:["ausgleichen","aufwiegen","kompensieren"],       ex:"The extra costs were offset by higher revenue.",       key:"offset" },
-  { w:"conceit",            de:["überheblichkeit","einbildung","dünkel"],        ex:"His conceit made him unpopular.",                      key:"conceit" },
-  { w:"champion",           de:["eintreten für","unterstützen","vertreten"],     ex:"She championed the rights of workers.",                key:"champion" },
-  { w:"illicit",            de:["illegal","unerlaubt","verboten"],               ex:"He was caught in illicit activities.",                  key:"illicit" },
-  { w:"thwart",             de:["vereiteln","durchkreuzen","hindern"],           ex:"His injuries thwarted his dream.",                     key:"thwart" },
-  { w:"embolden",           de:["ermutigen","bestärken","ermächtigen"],          ex:"The positive feedback emboldened her to speak up.",    key:"embolden" },
-  { w:"harbinger",          de:["vorbote","ankündiger","zeichen"],               ex:"The dark clouds were a harbinger of the storm.",       key:"harbinger" },
-  { w:"chalk up to",        de:["zurückführen auf","zuschreiben"],               ex:"He chalked his success up to hard work.",              key:"chalk" },
-  { w:"relinquish",         de:["aufgeben","abtreten","loslassen"],              ex:"He relinquished control of the company.",              key:"relinquish" },
-  { w:"facilitate",         de:["erleichtern","fördern","moderieren"],           ex:"The new bridge facilitates trade.",                    key:"facilitat" },
-  { w:"discount",           de:["ignorieren","abtun","außer acht lassen"],       ex:"He discounted her opinion.",                           key:"discount" },
-  { w:"haphazard",          de:["planlos","unbedacht","zufällig","chaotisch"],   ex:"The work was done in a haphazard manner.",             key:"haphazard" },
-  { w:"pass oneself off as",de:["ausgeben als","vorgeben zu sein"],              ex:"He tried to pass himself off as a doctor.",            key:"pass" },
-  { w:"downright",          de:["geradezu","absolut","regelrecht","schlicht"],   ex:"That is downright dangerous.",                         key:"downright" },
-  { w:"crack down on",      de:["hart vorgehen","durchgreifen"],                 ex:"The government cracked down on tax evasion.",          key:"crack down" },
-  { w:"all but",            de:["fast","nahezu","beinahe","so gut wie"],         ex:"The project is all but finished.",                     key:"all but" },
-  { w:"convey",             de:["vermitteln","überbringen","ausdrücken"],        ex:"The film conveys an important message.",               key:"convey" },
-  { w:"cow into submission",de:["einschüchtern","gefügig machen","unterwerfen"], ex:"He tried to cow his opponents into submission.",      key:"cow" },
-  { w:"marked rise",        de:["deutlicher anstieg","merklicher anstieg"],      ex:"There has been a marked rise in temperatures.",        key:"marked" },
-  { w:"pivot to",           de:["umschwenken","wechseln","zuwenden"],            ex:"The company pivoted to more independent research.",    key:"pivot" },
-  { w:"renounce",           de:["aufgeben","verzichten auf","abschwören"],       ex:"He renounced his former beliefs.",                     key:"renounce" },
-  { w:"eschew",             de:["meiden","vermeiden","scheuen"],                 ex:"He eschewed confrontation whenever possible.",         key:"eschew" },
-  { w:"spurn",              de:["zurückweisen","verschmähen","ablehnen"],        ex:"She spurned his offer.",                               key:"spurn" },
-  { w:"innocuous",          de:["harmlos","unschädlich","ungefährlich"],         ex:"The question seemed innocuous enough.",                key:"innocuous" },
-  { w:"take aback",         de:["überraschen","verblüffen","verblüfft"],         ex:"Her blunt answer took him aback.",                     key:"aback" },
-  { w:"decommissioning",    de:["stilllegung","außerbetriebnahme"],              ex:"The decommissioning of the power plant took years.",   key:"decommission" },
-  { w:"viable",             de:["realisierbar","tragfähig","machbar","möglich"], ex:"Is this plan financially viable?",                     key:"viable" },
-  { w:"garner",             de:["sammeln","gewinnen","ernten","bekommen"],       ex:"It failed to garner support.",                         key:"garner" },
-  { w:"sweeping",           de:["weitreichend","umfassend","tiefgreifend"],      ex:"The government introduced sweeping reforms.",          key:"sweeping" },
-  { w:"vindicate",          de:["rechtfertigen","rehabilitieren","bestätigen"],  ex:"The results vindicated her approach.",                 key:"vindicate" },
-  { w:"prowess",            de:["können","fähigkeit","stärke","talent"],         ex:"He was known for his athletic prowess.",               key:"prowess" },
-  { w:"indulgence",         de:["genuss","nachsicht","schwäche","verwöhnung"],   ex:"Chocolate is her one indulgence.",                     key:"indulgence" },
-  { w:"rendition",          de:["wiedergabe","version","darbietung","interpretation"], ex:"Her rendition of the song was breathtaking.",   key:"rendition" },
-  { w:"draw upon",          de:["zurückgreifen auf","nutzen","schöpfen"],        ex:"He could draw upon years of experience.",              key:"draw upon" },
-  { w:"elicit",             de:["hervorrufen","auslösen","entlocken"],           ex:"Use incentives to elicit desirable behaviour.",        key:"elicit" },
-  { w:"unfettered",         de:["uneingeschränkt","unbeschränkt","frei","ungehindert"], ex:"She gave him unfettered access to the archive.", key:"unfettered" },
-  { w:"prudence",           de:["umsicht","klugheit","besonnenheit","vorsicht"], ex:"She invested her money with great prudence.",          key:"prudence" },
-  { w:"indispensable",      de:["unentbehrlich","unverzichtbar","notwendig"],    ex:"Water is indispensable for life.",                     key:"indispensable" },
-  { w:"harness",            de:["nutzen","einsetzen","nutzbar machen"],          ex:"We need to harness the power of renewable energy.",    key:"harness" },
-  { w:"futile",             de:["vergeblich","sinnlos","zwecklos","erfolglos"],  ex:"It was futile to argue with him.",                     key:"futile" },
-  { w:"superficial",        de:["oberflächlich","flüchtig"],                     ex:"His analysis was superficial.",                        key:"superficial" },
-  { w:"buttress",           de:["untermauern","stützen","stärken","festigen"],   ex:"He buttressed his argument with solid evidence.",      key:"buttress" },
-  { w:"inept",              de:["inkompetent","ungeschickt","unfähig"],          ex:"The inept manager lost the team's trust.",             key:"inept" },
-  { w:"tried-and-true",     de:["bewährt","erprobt","zuverlässig"],              ex:"This is a tried-and-true method.",                     key:"tried" },
-  { w:"decry",              de:["verurteilen","anprangern","kritisieren"],       ex:"Critics decried the decision as irresponsible.",       key:"decry" },
-  { w:"debilitating",       de:["kräftezehrend","schwächend","erschöpfend"],     ex:"He suffered from a debilitating illness.",             key:"debilitating" },
-  { w:"muster",             de:["versammeln","aufbieten","zusammenraffen","aufbringen"], ex:"She mustered all her courage and spoke up.",   key:"muster" },
-  { w:"chafe at",           de:["ärgern","aufbegehren","sich reiben an"],        ex:"He chafed at the strict rules.",                       key:"chafe" },
-  { w:"spoils",             de:["beute","kriegsbeute"],                          ex:"The spoils were divided among the victors.",           key:"spoils" },
-  { w:"loath",              de:["ungern","abgeneigt","widerwillig"],             ex:"She was loath to admit her mistake.",                  key:"loath" },
-  { w:"scupper",            de:["versenken","zum scheitern bringen","zunichte machen"], ex:"Europe did not want to scupper the plan.",     key:"scupper" },
-  { w:"fall through",       de:["scheitern","platzen","zerschlagen"],            ex:"The plan fell through.",                               key:"fall through" },
-  { w:"hinge on",           de:["abhängen von","ankommen auf"],                  ex:"It hinges on the perception.",                         key:"hinge" },
-  { w:"be set on one's goals", de:["entschlossen","zielstrebig","zielfokussiert"], ex:"He is set on his goals.",                           key:"set on" },
-  { w:"pen",                de:["aufschreiben","aufsetzen","verfassen"],         ex:"She penned a letter to the editor.",                   key:"pen" },
-  { w:"squander",           de:["verschwenden","vergeuden","verschleudern"],     ex:"She saved her money rather than squandering it.",      key:"squander" },
-  { w:"evade",              de:["ausweichen","entziehen","umgehen","meiden"],    ex:"He evaded the question skillfully.",                   key:"evade" },
-  { w:"notch",              de:["kerbe","stufe","grad","niveau","level"],        ex:"Be a notch above the others.",                         key:"notch" },
-  { w:"chastise",           de:["zurechtweisen","tadeln","rügen","schelten"],    ex:"The teacher chastised the students for their behaviour.", key:"chastise" },
-  { w:"be at odds",         de:["uneinig sein","widerspruch stehen","gegensatz stehen"], ex:"Her statement is at odds with the evidence.", key:"odds" },
-  { w:"trade job",          de:["handwerksberuf","handwerk","berufsausbildung"], ex:"Trade jobs are in high demand.",                       key:"trade" },
-  { w:"scrutiny",           de:["prüfung","beobachtung","kontrolle","überprüfung"], ex:"The study did not stand up to scientific scrutiny.", key:"scrutiny" },
-  { w:"pivotal",            de:["entscheidend","zentral","wesentlich","ausschlaggebend"], ex:"US intelligence was pivotal in the operation.", key:"pivotal" },
-  { w:"cede",               de:["überlassen","abtreten","aufgeben","zedieren"], ex:"They refused to cede control of the territory.",       key:"cede" },
-  { w:"field",              de:["bearbeiten","entgegennehmen","abwimmeln"],      ex:"She fielded dozens of calls that morning.",            key:"field" },
-  { w:"contend",            de:["kämpfen mit","konkurrieren","behaupten"],       ex:"She had to contend with many obstacles.",              key:"contend" },
-  { w:"segue",              de:["übergehen","überleiten","wechseln"],            ex:"She used a story to segue into her main point.",       key:"segue" }
-];
+const SUPABASE_URL = 'https://duzfmlkjrfvkklvshptf.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_NkqVmFg1yYBTHMZvf0jQNw_MjawW9pa';
+
+// ═══════════════════════════════════════════════════════════
+// VOCABULARY DATA — loaded from Supabase
+// ═══════════════════════════════════════════════════════════
+let VOCAB = [];
 
 // ═══════════════════════════════════════════════════════════
 // STATE
@@ -421,9 +372,95 @@ let activeN = 0;
 let speechSupported = false;
 
 // ═══════════════════════════════════════════════════════════
+// SUPABASE FUNCTIONS
+// ═══════════════════════════════════════════════════════════
+async function loadVocabFromSupabase() {
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/vocab?select=*&order=id', {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY
+      }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    VOCAB = rows.map(r => ({
+      w: r.word,
+      de: r.translations,
+      ex: r.example || '',
+      key: r.key || r.word.toLowerCase().split(' ')[0],
+      hint: r.hint || ''
+    }));
+    document.getElementById('vocabCount').textContent = VOCAB.length + ' Vokabeln geladen';
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('startNoApiBtn').disabled = false;
+  } catch(e) {
+    document.getElementById('vocabCount').textContent = '⚠️ Fehler beim Laden: ' + e.message;
+    console.error('Supabase load error:', e);
+  }
+}
+
+function showAddVocab() {
+  hide('setupScreen');
+  show('addVocabScreen');
+}
+
+function hideAddVocab() {
+  hide('addVocabScreen');
+  show('setupScreen');
+  // Clear form
+  ['newWord','newTranslations','newExample','newKey','newHint'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('addFeedback').innerHTML = '';
+}
+
+async function saveNewVocab() {
+  const word = document.getElementById('newWord').value.trim();
+  const translations = document.getElementById('newTranslations').value.trim();
+  if (!word || !translations) {
+    document.getElementById('addFeedback').innerHTML = '<div class="fb fb-error">❌ Wort und Bedeutungen sind Pflichtfelder.</div>';
+    return;
+  }
+
+  const transArr = translations.split(',').map(t => t.trim()).filter(t => t);
+  const example = document.getElementById('newExample').value.trim() || null;
+  const key = document.getElementById('newKey').value.trim() || word.toLowerCase().split(' ')[0];
+  const hint = document.getElementById('newHint').value.trim() || null;
+
+  const body = { word, translations: transArr, example, key, hint };
+
+  document.getElementById('addFeedback').innerHTML = '<div class="fb fb-info">⏳ Speichern …</div>';
+
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/vocab', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'HTTP ' + res.status);
+    }
+    document.getElementById('addFeedback').innerHTML = '<div class="fb fb-success">✅ Vokabel gespeichert!</div>';
+    // Reload vocab list
+    await loadVocabFromSupabase();
+    // Clear form after short delay
+    setTimeout(() => hideAddVocab(), 1200);
+  } catch(e) {
+    document.getElementById('addFeedback').innerHTML = '<div class="fb fb-error">❌ Fehler: ' + e.message + '</div>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════
-function init() {
+async function init() {
   // Detect speech recognition support
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   speechSupported = !!SR;
@@ -432,16 +469,19 @@ function init() {
   apiKey = localStorage.getItem('vt_key') || '';
   if (apiKey) document.getElementById('apiKeyInput').value = apiKey;
 
+  // Load vocab from Supabase
+  await loadVocabFromSupabase();
+
   // Resume if saved progress
   const saved = localStorage.getItem('vt_progress');
-  if (saved) {
+  if (saved && VOCAB.length > 0) {
     try {
       const p = JSON.parse(saved);
       queue = p.queue;
       qIdx  = p.qIdx;
       useAPI = p.useAPI;
       apiKey = p.apiKey || apiKey;
-      if (qIdx < queue.length) {
+      if (qIdx < queue.length && queue.every(i => i < VOCAB.length)) {
         hide('setupScreen');
         show('trainingScreen');
         loadWord();
