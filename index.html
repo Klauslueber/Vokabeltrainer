@@ -176,6 +176,7 @@
   <h1 class="header-title">🎓 Vokabeltrainer</h1>
   <div class="header-right">
     <span class="progress-text" id="progressText">0 / 85</span>
+    <button class="icon-btn hidden" id="stopTrainingBtn" onclick="stopTraining()" title="Training beenden">✖️</button>
     <button class="icon-btn" onclick="openSettings()" title="Einstellungen">⚙️</button>
   </div>
 </div>
@@ -489,6 +490,7 @@ async function init() {
         hide('setupScreen');
         hide('addVocabBtnWrap');
         show('trainingScreen');
+        show('stopTrainingBtn');
         loadWord();
         return;
       }
@@ -521,6 +523,7 @@ function buildQueue() {
   hide('setupScreen');
   hide('addVocabBtnWrap');
   show('trainingScreen');
+  show('stopTrainingBtn');
   loadWord();
 }
 
@@ -863,8 +866,17 @@ function showFeedback(text, isAI) {
 // ═══════════════════════════════════════════════════════════
 function showCompletion() {
   hide('trainingScreen');
+  hide('stopTrainingBtn');
   show('completionScreen');
   localStorage.removeItem('vt_progress');
+}
+
+function stopTraining() {
+  if (recognition) recognition.stop();
+  hide('trainingScreen');
+  hide('stopTrainingBtn');
+  show('setupScreen');
+  show('addVocabBtnWrap');
 }
 
 function restart() {
