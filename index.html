@@ -204,7 +204,9 @@
 
     <button class="btn btn-primary" onclick="startTraining()" id="startBtn" disabled>Training starten 🚀</button>
     <button class="btn btn-link mt12" onclick="startWithoutAPI()" id="startNoApiBtn" disabled>Ohne KI-Bewertung starten</button>
-    <div class="divider"></div>
+  </div>
+
+  <div id="addVocabBtnWrap" class="card" style="text-align:center">
     <button class="btn btn-ghost" onclick="showAddVocab()">➕ &nbsp;Neue Vokabel hinzufügen</button>
   </div>
 
@@ -402,12 +404,14 @@ async function loadVocabFromSupabase() {
 
 function showAddVocab() {
   hide('setupScreen');
+  hide('addVocabBtnWrap');
   show('addVocabScreen');
 }
 
 function hideAddVocab() {
   hide('addVocabScreen');
   show('setupScreen');
+  show('addVocabBtnWrap');
   // Clear form
   ['newWord','newTranslations','newExample','newKey','newHint'].forEach(id => {
     document.getElementById(id).value = '';
@@ -483,6 +487,7 @@ async function init() {
       apiKey = p.apiKey || apiKey;
       if (qIdx < queue.length && queue.every(i => i < VOCAB.length)) {
         hide('setupScreen');
+        hide('addVocabBtnWrap');
         show('trainingScreen');
         loadWord();
         return;
@@ -514,6 +519,7 @@ function buildQueue() {
   qIdx = 0;
   saveProgress();
   hide('setupScreen');
+  hide('addVocabBtnWrap');
   show('trainingScreen');
   loadWord();
 }
@@ -865,6 +871,7 @@ function restart() {
   localStorage.removeItem('vt_progress');
   hide('completionScreen');
   show('setupScreen');
+  show('addVocabBtnWrap');
 }
 
 function openSettings() {
