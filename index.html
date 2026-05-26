@@ -126,10 +126,15 @@
     .transcript {
       background: #F8FAFC; border: 1.5px solid var(--border);
       border-radius: 10px; padding: 12px 14px; font-size: 15px;
-      min-height: 46px; color: var(--text); margin-top: 8px;
+      min-height: 56px; color: var(--text); margin-top: 8px;
       font-style: italic; line-height: 1.5;
+      width: 100%; resize: none; outline: none;
+      font-family: inherit; display: block; cursor: text;
+      transition: border-color .2s, background .2s;
     }
+    .transcript:focus { border-color: var(--primary); background: #fff; font-style: normal; }
     .transcript.has-text { font-style: normal; border-color: var(--primary); background: var(--primary-light); }
+    .transcript-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
 
     /* ── Sentence items ── */
     .sentence-item {
@@ -267,14 +272,20 @@
       <div class="mb-s1">
         <div class="label">Satz 1</div>
         <button class="btn btn-record" id="recBtn1" onclick="startRecording(1)">🎤 &nbsp;Satz 1 aufnehmen</button>
-        <div class="transcript" id="transcript1">–</div>
+        <textarea class="transcript" id="transcript1" rows="2"
+          placeholder="Satz aufnehmen oder direkt hier eintippen …"
+          oninput="onTranscriptInput(1)"></textarea>
+        <div class="transcript-hint">✏️ Text kann nach der Aufnahme bearbeitet werden</div>
       </div>
 
       <!-- Sentence 2 -->
       <div style="margin-top:16px">
         <div class="label">Satz 2</div>
         <button class="btn btn-record" id="recBtn2" onclick="startRecording(2)" disabled>🎤 &nbsp;Satz 2 aufnehmen</button>
-        <div class="transcript" id="transcript2">–</div>
+        <textarea class="transcript" id="transcript2" rows="2"
+          placeholder="Satz aufnehmen oder direkt hier eintippen …"
+          oninput="onTranscriptInput(2)"></textarea>
+        <div class="transcript-hint">✏️ Text kann nach der Aufnahme bearbeitet werden</div>
       </div>
 
       <!-- iOS fallback -->
@@ -550,9 +561,9 @@ function loadWord() {
   // Reset speaking phase
   resetRecBtn(1);
   resetRecBtn(2);
-  document.getElementById('transcript1').textContent = '–';
+  document.getElementById('transcript1').value = '';
   document.getElementById('transcript1').className = 'transcript';
-  document.getElementById('transcript2').textContent = '–';
+  document.getElementById('transcript2').value = '';
   document.getElementById('transcript2').className = 'transcript';
   document.getElementById('recBtn2').disabled = true;
   if (speechSupported) {
@@ -673,7 +684,7 @@ function startRecording(n) {
       else interim += e.results[i][0].transcript;
     }
     const el = document.getElementById('transcript' + n);
-    el.textContent = (finalText + interim).trim() || '…';
+    el.value = (finalText + interim).trim() || '…';
     el.className = 'transcript has-text';
     // Save immediately on final results (iOS may not fire onend reliably)
     if (finalText.trim()) {
@@ -685,8 +696,8 @@ function startRecording(n) {
   recognition.onend = () => {
     isRecording = false;
     resetRecBtn(n);
-    const text = finalText.trim() || document.getElementById('transcript' + n).textContent.trim();
-    if (text && text !== '–' && text !== '…') {
+    const text = finalText.trim() || document.getElementById('transcript' + n).value.trim();
+    if (text && text !== '…') {
       sentences[n - 1] = text;
       afterSentenceRecorded(n);
     } else {
@@ -708,12 +719,22 @@ function startRecording(n) {
 }
 
 function captureFromTranscript(n) {
-  const text = document.getElementById('transcript' + n).textContent.trim();
-  if (text && text !== '–' && text !== '…') {
+  const text = document.getElementById('transcript' + n).value.trim();
+  if (text && text !== '…') {
     sentences[n - 1] = text;
     return true;
   }
   return false;
+}
+
+function onTranscriptInput(n) {
+  const el = document.getElementById('transcript' + n);
+  const hasText = el.value.trim().length > 0;
+  el.classList.toggle('has-text', hasText);
+  // Enable recBtn2 if sentence 1 has input
+  if (n === 1 && hasText) {
+    document.getElementById('recBtn2').disabled = false;
+  }
 }
 
 function checkEnableEval() {
@@ -725,11 +746,10 @@ function checkEnableEval() {
 
 function confirmFromTranscripts() {
   try {
-    var t1 = document.getElementById('transcript1').textContent.trim();
-    var t2 = document.getElementById('transcript2').textContent.trim();
-    //debugLog('confirmFromTranscripts: t1="' + t1 + '", t2="' + t2 + '"');
-    if (t1 && t1 !== '–' && t1 !== '…') sentences[0] = t1;
-    if (t2 && t2 !== '–' && t2 !== '…') sentences[1] = t2;
+    var t1 = document.getElementById('transcript1').value.trim();
+    var t2 = document.getElementById('transcript2').value.trim();
+    if (t1 && t1 !== '…') sentences[0] = t1;
+    if (t2 && t2 !== '…') sentences[1] = t2;
     if (!sentences[0]) sentences[0] = '(nicht aufgenommen)';
     if (!sentences[1]) sentences[1] = '(nicht aufgenommen)';
     //debugLog('sentences: [' + sentences[0] + '] [' + sentences[1] + ']');
@@ -757,8 +777,8 @@ function resetRecBtn(n) {
 function useManualInput() {
   const s1 = document.getElementById('manualS1').value.trim();
   const s2 = document.getElementById('manualS2').value.trim();
-  if (s1) { sentences[0] = s1; document.getElementById('transcript1').textContent = s1; document.getElementById('transcript1').className = 'transcript has-text'; }
-  if (s2) { sentences[1] = s2; document.getElementById('transcript2').textContent = s2; document.getElementById('transcript2').className = 'transcript has-text'; }
+  if (s1) { sentences[0] = s1; document.getElementById('transcript1').value = s1; document.getElementById('transcript1').className = 'transcript has-text'; }
+  if (s2) { sentences[1] = s2; document.getElementById('transcript2').value = s2; document.getElementById('transcript2').className = 'transcript has-text'; }
 }
 
 // ═══════════════════════════════════════════════════════════
