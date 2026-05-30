@@ -1010,7 +1010,17 @@ function openSettings() {
   if (apiKey) localStorage.setItem('vt_key', apiKey);
   else localStorage.removeItem('vt_key');
   saveProgress();
-  alert(apiKey ? '✅ API-Key gespeichert.' : 'Kein API-Key — lokale Auswertung aktiv.');
+
+  const ok = prompt('OpenAI API-Key eingeben (leer lassen = Browser-Spracherkennung):', localStorage.getItem('vt_openai_key') || '');
+  if (ok === null) return;
+  openaiKey = ok.trim();
+  if (openaiKey) localStorage.setItem('vt_openai_key', openaiKey);
+  else localStorage.removeItem('vt_openai_key');
+
+  alert(
+    (apiKey ? '✅ Claude-Key gespeichert.' : 'Kein Claude-Key — lokale Auswertung.') + '\n' +
+    (openaiKey ? '✅ OpenAI-Key gespeichert.' : 'Kein OpenAI-Key — Browser-Spracherkennung.')
+  );
 }
 
 // ═══════════════════════════════════════════════════════════
