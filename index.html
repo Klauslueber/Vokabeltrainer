@@ -867,6 +867,7 @@ function resetRecBtn(n) {
   const btn = document.getElementById('recBtn' + n);
   if (!btn) return;
   btn.className = 'btn btn-record';
+  btn.disabled = false;
   btn.textContent = sentences[n - 1] ? `🔄  Satz ${n} neu aufnehmen` : `🎤  Satz ${n} aufnehmen`;
 }
 
