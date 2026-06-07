@@ -35,7 +35,7 @@ git push   # GitHub Pages deployt automatisch (~1-2 Minuten)
 |-------|-------|----------|
 | 1 Aussprache | `card1` | TTS via `SpeechSynthesis` → `pronounce()` |
 | 2 Übersetzung | `card2` | Tippfeld, Fuzzy-Match → `checkTranslation()` |
-| 3 Sprechen | `card3` | 2 Sätze via `SpeechRecognition` + editierbare Textareas |
+| 3 Sprechen | `card3` | 2 Sätze: Whisper API (wenn OpenAI-Key) oder Web `SpeechRecognition`; editierbare Textareas |
 | 4 Feedback | `card4` | Claude API oder lokales Keyword-Matching → `showFeedback()` |
 
 Navigation: `goPhase(n)` blendet Karten und Dot-Indikatoren um, scrollt nach oben.
@@ -43,10 +43,15 @@ Navigation: `goPhase(n)` blendet Karten und Dot-Indikatoren um, scrollt nach obe
 ### State & Persistenz
 
 `localStorage`:
-- `vt_key` — Claude API-Key
+- `vt_key` — Claude API-Key (Feedback-Phase)
+- `vt_openai_key` — OpenAI API-Key (Whisper-Spracherkennung); unabhängig von `vt_progress`
 - `vt_progress` — `{ queue, qIdx, useAPI, apiKey }` — wird bei jedem Wort gespeichert (`saveProgress()`)
 
-Globale Variablen: `VOCAB[]`, `queue[]` (shuffled Indices), `qIdx`, `voc` (aktuelle Vokabel), `sentences[2]`
+Globale Variablen: `VOCAB[]`, `queue[]` (shuffled Indices), `qIdx`, `voc` (aktuelle Vokabel), `sentences[2]`, `apiKey`/`useAPI` (Claude), `openaiKey`, `mediaRecorder`/`audioChunks[]`/`recognition` (Aufnahme-Backends), `isRecording`/`activeN` (welche Aufnahme läuft gerade), `speechSupported`
+
+**Aufnahme-State:** `isRecording` + `activeN` bilden eine simple State-Maschine. Solange `isRecording`, stoppt ein erneuter `startRecording()`-Aufruf die laufende Aufnahme statt eine neue zu starten. Beide Backends (Whisper, Web Speech) müssen `isRecording` im Abschluss-Handler zurücksetzen, sonst bleibt die App „in Aufnahme" hängen.
+
+**Wichtig:** Bei vorhandenem `vt_progress` überspringt `init()` den Setup-Screen komplett und springt direkt ins Training. Schlüssel können dann nur noch über den ⚙️-Button (`openSettings()`) gesetzt werden — der Setup-Screen ist nicht mehr erreichbar, bis das Training abgeschlossen ist oder `vt_progress` gelöscht wird.
 
 ### Supabase
 
@@ -54,6 +59,8 @@ Globale Variablen: `VOCAB[]`, `queue[]` (shuffled Indices), `qIdx`, `voc` (aktue
 - **Tabelle:** `vocab` — `id, word, translations TEXT[], example, key, hint, created_at`
 - **RLS:** Public read/insert/update/delete (Anon-Key im HTML, kein Secret)
 - Daten werden bei `init()` via PostgREST API geladen; `VOCAB` ist danach befüllt
+- **Mapping** (`loadVocabFromSupabase()`): `word→w`, `translations→de`, `example→ex`, `hint→hint`; fehlendes `key` fällt auf das erste Wort von `word` zurück (`word.toLowerCase().split(' ')[0]`)
+- **Neue Vokabel:** `saveNewVocab()` (Formular `newWord`/`newTranslations`/…) POSTet direkt in die Tabelle und ruft danach `loadVocabFromSupabase()` erneut auf; `translations` wird per Komma gesplittet
 
 ### Claude API (Feedback-Phase)
 
@@ -62,15 +69,25 @@ Globale Variablen: `VOCAB[]`, `queue[]` (shuffled Indices), `qIdx`, `voc` (aktue
 - Fallback auf `evaluateLocally()` wenn kein API-Key oder API-Fehler
 - Lokales Matching: alle Tokens aus `voc.key` müssen im Satz vorkommen
 
+### OpenAI Whisper (Sprechen-Phase)
+
+- Modell: `whisper-1`, Endpoint `https://api.openai.com/v1/audio/transcriptions`, `language=en`
+- `startRecording(n)` verzweigt: mit `openaiKey` → `startWhisperRecording()` (MediaRecorder + Whisper API), sonst → `startWebSpeechRecording()` (Web Speech API)
+- MediaRecorder bevorzugt `audio/webm;codecs=opus`, fällt auf `audio/webm` bzw. `audio/mp4` zurück (Safari/iOS)
+- Während des API-Calls zeigt der Button „⏳ Transkribiere …" und ist disabled
+- **Invariante:** Der Whisper-`onstop`-Handler setzt `btn.disabled = true` während der Transkription. `resetRecBtn(n)` (im `finally`) muss `disabled` wieder auf `false` setzen — sonst bleibt der Aufnahme-Button beim nächsten Wort ausgegraut, weil `loadWord()` den Zustand nicht erneut aufhebt. (`recBtn2` ist absichtlich disabled, bis Satz 1 vorliegt.)
+
 ## Wichtige JS-Funktionen
 
 - `init()` — Einstiegspunkt: Speech-Support, Supabase laden, gespeicherten Fortschritt wiederherstellen
 - `loadWord()` — UI zurücksetzen, `goPhase(1)` aufrufen
 - `goPhase(n)` — Karte n (1–4) einblenden, Dots aktualisieren, nach oben scrollen
 - `checkTranslation()` — Fuzzy-Match via `normalize()` (Umlaute → ASCII, Sonderzeichen entfernen)
-- `startRecording(n)` — `SpeechRecognition` starten/stoppen; bei Stopp: `captureFromTranscript()` aufrufen
+- `startRecording(n)` — Dispatcher; delegiert je nach `openaiKey` an `startWhisperRecording()` oder `startWebSpeechRecording()`; bei laufender Aufnahme: stoppen
+- `openSettings()` — Prompt-Dialoge für Claude- und OpenAI-Key; einziger Weg, Keys zu setzen wenn `init()` direkt ins Training springt
 - `confirmFromTranscripts()` — liest Sätze aus `#transcript1/2` Textarea-`.value` (iOS-sicher)
 - `onTranscriptInput(n)` — live `has-text`-Klasse aktualisieren; Satz-2-Button freischalten
+- `resetRecBtn(n)` — Aufnahme-Button optisch + funktional zurücksetzen (Text je nach `sentences[n-1]`, `disabled = false`)
 - `pronounce()` — bevorzugt Stimmen Samantha/Alex/Daniel/Karen; bereinigt `[...]`, `sb.`, `sth.`
 
 ## iOS-Besonderheiten
