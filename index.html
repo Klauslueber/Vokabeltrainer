@@ -75,10 +75,17 @@
     .dot.done { background: var(--success); }
 
     /* ── Word display ── */
-    .word-card { text-align: center; padding: 28px 16px 20px; }
+    .word-card { text-align: center; padding: 28px 16px 20px; position: relative; }
     .word-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; }
     .word-english { font-size: 34px; font-weight: 800; color: var(--primary); line-height: 1.2; margin-bottom: 6px; word-break: break-word; }
     .word-hint { font-size: 13px; color: var(--muted); font-style: italic; }
+    .btn-delete-word {
+      position: absolute; top: 10px; right: 10px;
+      background: none; border: none; cursor: pointer;
+      font-size: 18px; color: var(--muted); opacity: .55;
+      padding: 8px; line-height: 1;
+    }
+    .btn-delete-word:active { opacity: 1; transform: scale(.9); }
 
     /* ── Section labels ── */
     .label { font-size: 11px; font-weight: 700; letter-spacing: .8px; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; }
@@ -234,6 +241,7 @@
 
     <!-- Word card -->
     <div class="card word-card">
+      <button class="btn-delete-word" id="deleteWordBtn" onclick="deleteCurrentWord()" title="Vokabel löschen – kann ich schon">🗑️</button>
       <div class="word-label">Englisches Wort</div>
       <div class="word-english" id="wordDisplay">…</div>
       <div class="word-hint" id="wordHint"></div>
@@ -408,6 +416,7 @@ async function loadVocabFromSupabase() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const rows = await res.json();
     VOCAB = rows.map(r => ({
+      id: r.id,
       w: r.word,
       de: r.translations,
       ex: r.example || '',
@@ -612,6 +621,36 @@ function goPhase(p) {
 
 function nextWord() { qIdx++; saveProgress(); loadWord(); }
 function skipToNext() { nextWord(); }
+
+async function deleteCurrentWord() {
+  if (!voc) return;
+  if (!confirm(`„${voc.w}" wirklich löschen? Die Vokabel wird dauerhaft aus deinem Trainer entfernt.`)) return;
+
+  const btn = document.getElementById('deleteWordBtn');
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/vocab?id=eq.${voc.id}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY
+      }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+
+    const removedIdx = queue[qIdx];
+    VOCAB.splice(removedIdx, 1);
+    queue = queue.filter(i => i !== removedIdx).map(i => i > removedIdx ? i - 1 : i);
+
+    saveProgress();
+    loadWord();
+  } catch (e) {
+    alert('Fehler beim Löschen: ' + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
 
 // ═══════════════════════════════════════════════════════════
 // PRONUNCIATION
