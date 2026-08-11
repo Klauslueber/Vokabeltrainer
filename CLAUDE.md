@@ -36,9 +36,11 @@ git push   # GitHub Pages deployt automatisch (~1-2 Minuten)
 | 1 Aussprache | `card1` | TTS via `SpeechSynthesis` → `pronounce()` |
 | 2 Übersetzung | `card2` | Tippfeld, Fuzzy-Match → `checkTranslation()` |
 | 3 Sprechen | `card3` | 2 Sätze: Whisper API (wenn OpenAI-Key) oder Web `SpeechRecognition`; editierbare Textareas |
-| 4 Feedback | `card4` | Claude API oder lokales Keyword-Matching → `showFeedback()` |
+| 4 Feedback | `card4` | Claude API oder lokales Keyword-Matching → `showFeedback()`; bei Claude-Auswertung zusätzlich Synonyme |
 
 Navigation: `goPhase(n)` blendet Karten und Dot-Indikatoren um, scrollt nach oben.
+
+Die Wortkarte (`.word-card`, oberhalb aller vier Phasen-Cards) ist phasenübergreifend sichtbar und enthält den 🗑️-Button (`deleteCurrentWord()`) zum Löschen der aktuellen Vokabel.
 
 ### State & Persistenz
 
@@ -51,6 +53,8 @@ Globale Variablen: `VOCAB[]`, `queue[]` (shuffled Indices), `qIdx`, `voc` (aktue
 
 **Aufnahme-State:** `isRecording` + `activeN` bilden eine simple State-Maschine. Solange `isRecording`, stoppt ein erneuter `startRecording()`-Aufruf die laufende Aufnahme statt eine neue zu starten. Beide Backends (Whisper, Web Speech) müssen `isRecording` im Abschluss-Handler zurücksetzen, sonst bleibt die App „in Aufnahme" hängen.
 
+**Vokabel löschen:** `deleteCurrentWord()` löscht per DELETE-Request in Supabase (`voc.id`) und muss `VOCAB` und `queue` konsistent halten: `queue` enthält Indices in `VOCAB`, daher werden nach `VOCAB.splice()` alle `queue`-Einträge > dem gelöschten Index um 1 dekrementiert (der gelöschte Index selbst wird herausgefiltert). `qIdx` bleibt unverändert — durch das Herausfiltern des aktuellen Eintrags zeigt `queue[qIdx]` danach automatisch auf das nächste Wort, ein `loadWord()` reicht.
+
 **Wichtig:** Bei vorhandenem `vt_progress` überspringt `init()` den Setup-Screen komplett und springt direkt ins Training. Schlüssel können dann nur noch über den ⚙️-Button (`openSettings()`) gesetzt werden — der Setup-Screen ist nicht mehr erreichbar, bis das Training abgeschlossen ist oder `vt_progress` gelöscht wird.
 
 ### Supabase
@@ -59,8 +63,9 @@ Globale Variablen: `VOCAB[]`, `queue[]` (shuffled Indices), `qIdx`, `voc` (aktue
 - **Tabelle:** `vocab` — `id, word, translations TEXT[], example, key, hint, created_at`
 - **RLS:** Public read/insert/update/delete (Anon-Key im HTML, kein Secret)
 - Daten werden bei `init()` via PostgREST API geladen; `VOCAB` ist danach befüllt
-- **Mapping** (`loadVocabFromSupabase()`): `word→w`, `translations→de`, `example→ex`, `hint→hint`; fehlendes `key` fällt auf das erste Wort von `word` zurück (`word.toLowerCase().split(' ')[0]`)
+- **Mapping** (`loadVocabFromSupabase()`): `id→id`, `word→w`, `translations→de`, `example→ex`, `hint→hint`; fehlendes `key` fällt auf das erste Wort von `word` zurück (`word.toLowerCase().split(' ')[0]`). `id` wird für `deleteCurrentWord()` benötigt.
 - **Neue Vokabel:** `saveNewVocab()` (Formular `newWord`/`newTranslations`/…) POSTet direkt in die Tabelle und ruft danach `loadVocabFromSupabase()` erneut auf; `translations` wird per Komma gesplittet
+- **Vokabel löschen:** `deleteCurrentWord()` sendet `DELETE /vocab?id=eq.{voc.id}`, nach Bestätigung durch `confirm()`
 
 ### Claude API (Feedback-Phase)
 
@@ -68,6 +73,7 @@ Globale Variablen: `VOCAB[]`, `queue[]` (shuffled Indices), `qIdx`, `voc` (aktue
 - Direkter Browser-Call mit Header `anthropic-dangerous-direct-browser-access: true`
 - Fallback auf `evaluateLocally()` wenn kein API-Key oder API-Fehler
 - Lokales Matching: alle Tokens aus `voc.key` müssen im Satz vorkommen
+- Der Prompt in `evaluateWithClaude()` fordert neben der Bewertung auch 3-5 Synonyme zu `voc.w`, markiert mit einer Zeile `SYNONYMS: ...`; die Antwort wird per Regex in `feedbackText`/`synonyms` gesplittet. Reihenfolge in `showFeedback()`: Bewertungstext → 📖 Beispielsatz (`voc.ex`) → 🔁 Synonyme. Nur im Claude-Modus verfügbar, `evaluateLocally()` liefert keine Synonyme.
 
 ### OpenAI Whisper (Sprechen-Phase)
 
@@ -89,6 +95,7 @@ Globale Variablen: `VOCAB[]`, `queue[]` (shuffled Indices), `qIdx`, `voc` (aktue
 - `onTranscriptInput(n)` — live `has-text`-Klasse aktualisieren; Satz-2-Button freischalten
 - `resetRecBtn(n)` — Aufnahme-Button optisch + funktional zurücksetzen (Text je nach `sentences[n-1]`, `disabled = false`)
 - `pronounce()` — bevorzugt Stimmen Samantha/Alex/Daniel/Karen; bereinigt `[...]`, `sb.`, `sth.`
+- `deleteCurrentWord()` — löscht die aktuelle Vokabel nach `confirm()` per Supabase-DELETE, hält `VOCAB`/`queue` konsistent (siehe Invariante oben) und lädt direkt das nächste Wort
 
 ## iOS-Besonderheiten
 
@@ -99,7 +106,7 @@ Globale Variablen: `VOCAB[]`, `queue[]` (shuffled Indices), `qIdx`, `voc` (aktue
 ## VOCAB-Format
 
 ```js
-{ w: "word", de: ["bedeutung1", "bedeutung2"], ex: "Example sentence.", key: "word", hint?: "aussprache-tipp" }
+{ id: 1, w: "word", de: ["bedeutung1", "bedeutung2"], ex: "Example sentence.", key: "word", hint?: "aussprache-tipp" }
 ```
 
-`key` ist die Whitelist für lokales Keyword-Matching (einzelne Tokens, die alle im Satz vorkommen müssen).
+`key` ist die Whitelist für lokales Keyword-Matching (einzelne Tokens, die alle im Satz vorkommen müssen). `id` ist die Supabase-Row-ID, benötigt für `deleteCurrentWord()`.
