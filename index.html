@@ -910,7 +910,9 @@ Please evaluate in English (concise, max. 100 words):
 • Are there any grammatical errors?
 • Give concrete improvement suggestions where needed.
 
-Start with an overall verdict: ✅ Well done! / ⚠️ Almost! / ❌ Not quite right.`;
+Start with an overall verdict: ✅ Well done! / ⚠️ Almost! / ❌ Not quite right.
+
+After the evaluation, on a new line, provide 3-5 common English synonyms for "${voc.w}" (comma-separated, no explanations), prefixed with exactly "SYNONYMS:".`;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -933,7 +935,11 @@ Start with an overall verdict: ✅ Well done! / ⚠️ Almost! / ❌ Not quite r
       throw new Error(err.error?.message || `HTTP ${res.status}`);
     }
     const data = await res.json();
-    showFeedback(data.content[0].text, true);
+    const fullText = data.content[0].text;
+    const synMatch = fullText.match(/SYNONYMS:\s*(.+)/i);
+    const synonyms = synMatch ? synMatch[1].trim() : '';
+    const feedbackText = fullText.replace(/SYNONYMS:.*/is, '').trim();
+    showFeedback(feedbackText, true, synonyms);
   } catch (e) {
     console.error('API error:', e);
     // Prepend error, fall back to local
@@ -965,7 +971,7 @@ function evaluateLocally(prefix = '') {
   showFeedback(feedback, false);
 }
 
-function showFeedback(text, isAI) {
+function showFeedback(text, isAI, synonyms = '') {
   document.getElementById('s1Display').textContent = '1.  ' + sentences[0];
   document.getElementById('s2Display').textContent = '2.  ' + sentences[1];
 
@@ -973,7 +979,11 @@ function showFeedback(text, isAI) {
   const isGood = text.includes('✅') || /sehr gut|korrekt|richtig|well done/i.test(text);
   const isBad  = text.includes('❌') || /falsch|nicht korrekt|error/i.test(text);
   box.className = 'fb ' + (isBad ? 'fb-error' : isGood ? 'fb-success' : 'fb-info');
-  box.textContent = text + (isAI ? '\n\n📖 Example: ' + voc.ex : '');
+
+  let out = text;
+  if (isAI) out += '\n\n📖 Example: ' + voc.ex;
+  if (synonyms) out += '\n\n🔁 Synonyms: ' + synonyms;
+  box.textContent = out;
 
   goPhase(4);
 }
